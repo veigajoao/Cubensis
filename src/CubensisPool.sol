@@ -3,16 +3,18 @@ pragma solidity 0.8.24;
 
 import "./interfaces/ICubensisPool.sol";
 
+import { UD60x18, convert, ZERO } from "@prb/math/src/UD60x18.sol";
+
 import "./libraries/BitMath.sol";
 import "./libraries/TickBitmap.sol";
 import "./libraries/Tick.sol";
 import "./libraries/Position.sol";
 import "./libraries/FixedMath.sol";
 
-contract CubensisPool is ICubensisPool {
+abstract contract CubensisPool is ICubensisPool {
     using TickBitmap for mapping (int16 => uint256);
     using Tick for Tick.Info;
-    using Position for mapping(bytes32 => Position); 
+    using Position for mapping(bytes32 => Position.Info); 
     using Position for Position.Info;
 
     // address for token pair in pool
@@ -67,9 +69,9 @@ contract CubensisPool is ICubensisPool {
     function _convertAtTick(
         bool zeroForOne,
         int24 tick,
-        uint256 quantity
-    ) private pure returns (uint256 value) {
-        value = FixedMath.convertAtTick(zeroForOne, tick, base);
+        UD60x18 quantity
+    ) internal pure returns (UD60x18 value) {
+        value = FixedMath.convertAtTick(zeroForOne, tick, quantity);
     }
 
     /**
@@ -82,10 +84,10 @@ contract CubensisPool is ICubensisPool {
      */
     function _addTokensAccount(
         bool zeroForOne,
-        uint256 quantity,
+        UD60x18 quantity,
         address account
-    ) private {
-        tokenBalances[zeroForOne][account] += quantity;
+    ) internal {
+        tokenBalances[zeroForOne][account] += convert(quantity);
     }
 
     /**
@@ -98,10 +100,10 @@ contract CubensisPool is ICubensisPool {
      */
     function _removeTokensAccount(
         bool zeroForOne,
-        uint256 quantity,
+        UD60x18 quantity,
         address account
-    ) private {
-        tokenBalances[zeroForOne][account] -= quantity;
+    ) internal {
+        tokenBalances[zeroForOne][account] -= convert(quantity);
     }
 
     /**
@@ -116,32 +118,32 @@ contract CubensisPool is ICubensisPool {
     function _addLiquidityToTick(
         bool zeroForOne,
         int24 tick,
-        uint256 amountIn,
+        UD60x18 amountIn,
         address account
-    ) private {
+    ) internal {
         // load tick struct
         Tick.Info storage tickInfo = ticks[zeroForOne][tick];
-        Tick.Info memory _tickInfo = tick;
+        Tick.Info memory _tickInfo = tickInfo;
 
         // load position strct
         Position.Info storage position = positions[zeroForOne].get(account, tick);
-        Position.Info memory _position = position;
 
         // if tick is uninitiliazed in map, flip it
-        if (_tickInfo.totalBalance == _tickInfo.executedBalance) {
+        // we are assuming empty ticks are always 0
+        if (_tickInfo.totalBalance == ZERO) {
             tickBitmap[zeroForOne].flipTick(tick, tickSpacing);
         }
 
         // get Tick data and update it
-        tick.addLiquidity(amountIn);
+        tickInfo.addLiquidity(amountIn);
 
         // get User's Position and update it
-        uint256 executedTokens = position.addLiquidity(tickInfo, amountIn);
+        UD60x18 executedTokens = position.addLiquidity(tickInfo, amountIn);
 
         // credit any executionTokens to account
         // must convert quantity of executed tokens to amount
         // of other sided tokens
-        _addTokensAccount(!zeroForOne, _convertAtTick(zeroForOne, tick, executedTokens));
+        _addTokensAccount(!zeroForOne, _convertAtTick(zeroForOne, tick, executedTokens), account);
     }
 
     /**
@@ -156,35 +158,32 @@ contract CubensisPool is ICubensisPool {
     function _removeLiquidityFromTick(
         bool zeroForOne,
         int24 tick,
-        uint256 amountOut,
+        UD60x18 amountOut,
         address account
-    ) private {
+    ) internal {
         // load tick struct
         Tick.Info storage tickInfo = ticks[zeroForOne][tick];
-        Tick.Info memory _tickInfo = tick;
+        Tick.Info memory _tickInfo = tickInfo;
 
         // load position strct
         Position.Info storage position = positions[zeroForOne].get(account, tick);
-        Position.Info memory _position = position;
 
-        // if tick is uninitiliazed in map, flip it
-        if (_tickInfo.totalBalance == _tickInfo.executedBalance) {
+        // get Tick data and update it
+        // throws if not enough liquidity
+        tickInfo.removeLiquidity(amountOut);
+
+        // must flip tick if liquidity goes to zero
+        if (_tickInfo.totalBalance == ZERO) {
             tickBitmap[zeroForOne].flipTick(tick, tickSpacing);
         }
 
-        // get Tick data and update it
-        tick.removeLiquidity(amountOut);
-
-        // must flip tick if liquidity goes to zero
-        if (ti)
-
         // get User's Position and update it
-        uint256 executedTokens = position.removeLiquidity(tickInfo, amountOut);
+        UD60x18 executedTokens = position.removeLiquidity(tickInfo, amountOut);
 
         // credit any executionTokens to account
         // must convert quantity of executed tokens to amount
         // of other sided tokens
-        _addTokensAccount(!zeroForOne, _convertAtTick(zeroForOne, tick, executedTokens));
+        _addTokensAccount(!zeroForOne, _convertAtTick(zeroForOne, tick, executedTokens), account);
     }
 
     /**
@@ -198,27 +197,27 @@ contract CubensisPool is ICubensisPool {
     function _executeOnTick(
         bool zeroForOne,
         int24 tick,
-        uint256 amount
-    )  returns (uint256 executed, uint256 received) {
+        UD60x18 amount
+    ) internal returns (UD60x18 executed, UD60x18 received) {
         // load tick struct
         Tick.Info storage tickInfo = ticks[!zeroForOne][tick];
-        Tick.Info memory _tickInfo = tick;
+        Tick.Info memory _tickInfo = tickInfo;
 
-        uint256 tokensToReceive = _convertAtTick(zeroForOne, tick, amount);
+        UD60x18 tokensToReceive = _convertAtTick(zeroForOne, tick, amount);
 
-        if (_tickInfo.totalBalance - _tickInfo.executedBalance <= tokensToReceive) {
+        if (_tickInfo.totalBalance <= tokensToReceive) {
             // If trade is going to take all tokens, recalculated received and executed
-            received = _tickInfo.totalBalance - _tickInfo.executedBalance;
+            received = _tickInfo.totalBalance;
             executed = _convertAtTick(zeroForOne, tick, received);
             // set executedBalance to be the full amount of tokens
-            tickInfo.executedBalance = _tickInfo.totalBalance;
+            tickInfo.applyTrade(executed);
             // flip tick in bitmap
             tickBitmap[!zeroForOne].flipTick(tick, tickSpacing);
         } else {
             // If trade does not deplete tick, merely update variables
             received = tokensToReceive;
             executed = amount;
-            tickInfo.executedBalance += tokensToReceive;
+            tickInfo.applyTrade(executed);
         }
         
     }
@@ -244,19 +243,19 @@ contract CubensisPool is ICubensisPool {
         bool zeroForOne,
         int24 tick,
         uint256 amountIn
-    ) external returns (uint256 amountInExecuted);
+    ) external virtual returns (uint256 amountInExecuted);
 
     /// @inheritdoc ICubensisPool
     function removeOrder(
         bool zeroForOne,
         int24 tick,
         uint256 amountOut
-    ) external returns (uint256 amountOutExecuted);
+    ) external virtual returns (uint256 amountOutExecuted);
 
     /// @inheritdoc ICubensisPool
     function claimExceutedOrder(
         int24 tick
-    ) external returns (uint256 amount0, uint256 amount1);
+    ) external virtual returns (uint256 amount0, uint256 amount1);
 
 
 }

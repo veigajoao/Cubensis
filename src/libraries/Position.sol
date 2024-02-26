@@ -11,6 +11,8 @@ import "./Tick.sol";
 library Position {
     // info stored for each user's position
     struct Info {
+        // counter to track tick restarts after finishing liquidty
+        uint256 counter;
         // The order value in this tick
         UD60x18 totalBalance;
         // The amount of executed value
@@ -48,11 +50,31 @@ library Position {
         Info memory _self = self;
         Tick.Info memory _tick = tick;
 
-        UD60x18 newBalance = _self.totalBalance * _tick.executedRatio / _self.executedRatio;
+        if (_self.counter == 0) {
+            self.counter = _tick.counter;
+            self.executedRatio = _tick.executedRatio;
+            // self.totalBalance = ZERO; // not necessary, starts as zero
+        }
 
-        executed = _self.totalBalance - newBalance;
+        if (_tick.counter != _self.counter) {
+            // if counter is different that means the tick was executed in full
+            // and has restarted. execute entire user position
+            executed = _self.totalBalance;
 
-        self.totalBalance = newBalance;
+            self.counter = _tick.counter;
+            self.totalBalance = ZERO;
+            self.executedRatio = _tick.executedRatio;
+
+
+        } else {
+            // if counter is the same that means the tick hasn't been fully executed
+            // apply partial execution logic
+            UD60x18 _newBalance = _self.totalBalance * _tick.executedRatio / _self.executedRatio;
+            executed = _self.totalBalance - _newBalance;
+
+            self.totalBalance = _newBalance;
+            self.executedRatio = _tick.executedRatio;
+        }
     }
 
     /** 
@@ -73,7 +95,7 @@ library Position {
         executed = update(self, tick);
 
         self.totalBalance = _self.totalBalance + addedLiquidity;
-        self.executedRatio = ZERO;
+        self.executedRatio = tick.executedRatio;
 
     }
 
@@ -95,7 +117,7 @@ library Position {
         executed = update(self, tick);
 
         self.totalBalance = _self.totalBalance - removedLiquidity;
-        self.executedRatio = ZERO;
+        self.executedRatio = tick.executedRatio;
 
     }
 }
