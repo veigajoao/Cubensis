@@ -7,7 +7,11 @@ interface ICubensisPool {
      * @notice Swap token0 for token1 or token1 for token0
      * at a given tick, add unexecuted part of trade as limit
      * order
-     * @param zeroForOne The direction of the swap, true for token0 to token1, false for token1 to token0
+     * @dev current implementation is only aware of the selected tick.
+     * A more advanced version should look across neighboring ticks as well
+     * @param zeroForOne The token of the trade. Always refers to liquidity held
+     * in the contract. false for adding liquidity to token0 or buying token0, true
+     * for adding liquidity to token1 or buying token1
      * @param tick The tick at which the trade should be executed.
      * @param amountIn The amount of tokens to swap (in token that the user is selling)
      * @return amountInExecuted The amount of tokens that were swapped (denominated in token user is selling)
@@ -21,7 +25,9 @@ interface ICubensisPool {
     /**
      * @notice Swap token0 for token1 or token1 for token0
      * at a given tick, return unexecuted part to user  * order
-     * @param zeroForOne The direction of the swap, true for token0 to token1, false for token1 to token0
+     * @param zeroForOne The token of the trade. Always refers to liquidity held
+     * in the contract. false for adding liquidity to token0 or buying token0, true
+     * for adding liquidity to token1 or buying token1
      * @param tick The tick at which the trade should be executed.
      * @param amountIn The amount of tokens to swap (in token that the user is selling)
      * @return amountInExecuted The amount of tokens that were swapped (denominated in token user is selling)
@@ -34,16 +40,19 @@ interface ICubensisPool {
 
     /**
      * @notice Remove order previously created at a given tick
-     * @param zeroForOne The direction of the swap, true for token0 to token1, false for token1 to token0
+     * @dev fails if amountOut is not possible to withdraw. Always withdraws the
+     * exact amount requested by the user
+     * @param zeroForOne The token of the trade. Always refers to liquidity held
+     * in the contract. false for adding liquidity to token0 or buying token0, true
+     * for adding liquidity to token1 or buying token1
      * @param tick The tick at which the order is located.
      * @param amountOut The amount of tokens to remove from the order
-     * @return amountOutExecuted The amount of tokens that were successfully removed from the order
      */
     function removeOrder(
         bool zeroForOne,
         int24 tick,
         uint256 amountOut
-    ) external returns (uint256 amountOutExecuted);
+    ) external;
 
     /**
      * @notice After orders are successfully executed, they must be claimed

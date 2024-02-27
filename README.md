@@ -12,8 +12,13 @@ Each pool is composed of 2 assets `A` and `B`. There are different price tickets
 
 Any time a user sets a limit order, they select an amount of liquidity and a `tick` value to set their limit orders at. The contract first checks if there is enough opposite side liquidity at that `tick` or at a better priced `tick` than the one requested by the user. If it can find such a `tick`, then it will execute the trade on that `tick`, otherwise, it is going to provide liquidity on that `tick` and create an NFT for the user representing their newly created liquidity position.
 
-### Considerations
-- [ ] Check if Uniswap V3's tick math libs are enough for our needs
+### TODO
+- [x] Build price conversion engine - Built using fixed point math
+- [x] Build matching engine - We don't need one, MEV is going to match displaced orders for us in O(1)
+- [ ] Emit events
+- [ ] Build relevant tests
+ 
+### Future work
 - [ ] Currently order of execution within the same `tick` are executed in parallel, according to their share of the `tick` pool. We need to make sure that is acceptable
 - [ ] Currently assets are locked and do not generate yield when they are awaiting execution. A way to generate yield would facilitate liquidity for the protocol
 - [ ] A private implementation of Cubensis requires adapting to privacy preserving libraries and designs of the target chain
