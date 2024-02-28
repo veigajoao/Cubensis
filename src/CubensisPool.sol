@@ -5,17 +5,16 @@ import "./interfaces/ICubensisPool.sol";
 
 import { UD60x18, convert, ZERO } from "@prb/math/src/UD60x18.sol";
 
-import "./libraries/BitMath.sol";
-import "./libraries/TickBitmap.sol";
 import "./libraries/Tick.sol";
 import "./libraries/Position.sol";
 import "./libraries/FixedMath.sol";
 
-abstract contract CubensisPool is ICubensisPool {
-    using TickBitmap for mapping (int16 => uint256);
+contract CubensisPool is ICubensisPool {
     using Tick for Tick.Info;
     using Position for mapping(bytes32 => Position.Info); 
     using Position for Position.Info;
+
+    error Debug(uint256);
 
     // address for token pair in pool
     // prices are always quoted as token1/token0
@@ -28,18 +27,14 @@ abstract contract CubensisPool is ICubensisPool {
     // In PoC balances are tracked internally for simplicity
     mapping(bool => mapping (address => uint256)) public tokenBalances;
 
-    // minimum spacing between 2 price ticks
-    int24 public tickSpacing;
-
+    // Each tick represents an 0.001 change in price
     mapping (bool => mapping(int24 => Tick.Info)) public ticks;
 
     // maps for each user position
     // each position map is equivalent to one side of trade
     mapping(bool => mapping(bytes32 => Position.Info)) public positions;
 
-    constructor() {
-
-    }
+    constructor() {}
 
     /// INTERNAL FUNCTIONS
 
@@ -156,7 +151,7 @@ abstract contract CubensisPool is ICubensisPool {
         UD60x18 amount
     ) internal returns (UD60x18 executed, UD60x18 received) {
         // load tick struct
-        Tick.Info storage tickInfo = ticks[!zeroForOne][tick];
+        Tick.Info storage tickInfo = ticks[zeroForOne][tick];
         Tick.Info memory _tickInfo = tickInfo;
 
         UD60x18 tokensToReceive = FixedMath.convertAtTick(zeroForOne, tick, amount);
@@ -166,7 +161,9 @@ abstract contract CubensisPool is ICubensisPool {
             received = _tickInfo.totalBalance;
             executed = FixedMath.convertAtTick(zeroForOne, tick, received);
             // set executedBalance to be the full amount of tokens
-            tickInfo.applyTrade(executed);
+            // only call if executed > 0
+            if (executed > ZERO) tickInfo.applyTrade(executed);
+            
         } else {
             // If trade does not deplete tick, merely update variables
             received = tokensToReceive;
@@ -183,7 +180,7 @@ abstract contract CubensisPool is ICubensisPool {
         bool zeroForOne,
         int24 tick,
         uint256 amountIn
-    ) external returns (uint256 amountInExecuted) {
+    ) external returns (uint256 amountInExecuted, uint256 amountOutReceived) {
         UD60x18 _amountIn = convert(amountIn);
         address _sender = msg.sender;
 
@@ -192,7 +189,7 @@ abstract contract CubensisPool is ICubensisPool {
 
         // check tick for other side trade
         (UD60x18 _executed, UD60x18 _received) = _executeOnTick(zeroForOne, tick, _amountIn);
-        
+
         // add rest as limit order
         _addLiquidityToTick(!zeroForOne, tick, _amountIn - _executed, _sender);
 
@@ -200,6 +197,7 @@ abstract contract CubensisPool is ICubensisPool {
         _addTokensAccount(zeroForOne, _received, _sender);
 
         amountInExecuted = convert(_executed);
+        amountOutReceived = convert(_received);
     }
 
     /// @inheritdoc ICubensisPool
@@ -207,7 +205,7 @@ abstract contract CubensisPool is ICubensisPool {
         bool zeroForOne,
         int24 tick,
         uint256 amountIn
-    ) external returns (uint256 amountInExecuted) {
+    ) external returns (uint256 amountInExecuted, uint256 amountOutReceived) {
         UD60x18 _amountIn = convert(amountIn);
         address _sender = msg.sender;
 
@@ -217,7 +215,7 @@ abstract contract CubensisPool is ICubensisPool {
 
         // check tick for other side trade
         (UD60x18 _executed, UD60x18 _received) = _executeOnTick(zeroForOne, tick, _amountIn);
-        
+
         // transfer in consumed amountIn tokens
         _removeTokensAccount(!zeroForOne, _executed, _sender);
 
@@ -225,6 +223,7 @@ abstract contract CubensisPool is ICubensisPool {
         _addTokensAccount(zeroForOne, _received, _sender);
 
         amountInExecuted = convert(_executed);
+         amountOutReceived = convert(_received);
     }
 
     /// @inheritdoc ICubensisPool
@@ -253,6 +252,5 @@ abstract contract CubensisPool is ICubensisPool {
         amount0 = convert(_executed0);
         amount1 = convert(_executed1);
     }
-
 
 }

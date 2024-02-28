@@ -8,9 +8,11 @@ It is based off of Uniswap V3 principles.
 
 The main insight is to use the tech stack that Uniswap V3 built for tracking liquidity across different price `ticks` to track limit order book activity.
 
-Each pool is composed of 2 assets `A` and `B`. There are different price tickets for the asset pairs, each `tick` represents a 0.0001% increment in price between two points on an asset pair's graph.
+Each pool is composed of 2 assets `A` and `B`. There are different price tickets for the asset pairs, each `tick` represents a 0.001% increment in price between two points on an asset pair's graph.
 
-Any time a user sets a limit order, they select an amount of liquidity and a `tick` value to set their limit orders at. The contract first checks if there is enough opposite side liquidity at that `tick` or at a better priced `tick` than the one requested by the user. If it can find such a `tick`, then it will execute the trade on that `tick`, otherwise, it is going to provide liquidity on that `tick` and create an NFT for the user representing their newly created liquidity position.
+Any time a user sets a limit order, they select an amount of liquidity and a `tick` value to set their limit orders at. The contract first checks if there is enough opposite side liquidity at that `tick`. If it can find such a `tick`, then it will execute the trade on that `tick`, otherwise, it is going to provide liquidity on that `tick` and create an NFT for the user representing their newly created liquidity position.
+
+The main goal of this project is to provide the basis for a fully on chain orderbook protocol. This project can then be adapted for deployed on privacy preserving EVMs to constitute a **true source of dark liquidity on chain**.
 
 ### TODO
 - [x] Build price conversion engine - Built using fixed point math

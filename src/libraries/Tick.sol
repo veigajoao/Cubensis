@@ -27,12 +27,11 @@ library Tick {
     ) internal {
         Info memory _self = self;
 
-        require(_self.totalBalance > ZERO);
-
         UD60x18 _newBalance = _self.totalBalance - tradedAmount;
 
-        self.executedRatio = _newBalance * _self.executedRatio / _self.totalBalance;
+        self.executedRatio = (convert(1) - tradedAmount / _self.totalBalance) * self.executedRatio;
         self.totalBalance = _newBalance;
+
     }
 
     /**

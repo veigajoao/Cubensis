@@ -15,12 +15,13 @@ interface ICubensisPool {
      * @param tick The tick at which the trade should be executed.
      * @param amountIn The amount of tokens to swap (in token that the user is selling)
      * @return amountInExecuted The amount of tokens that were swapped (denominated in token user is selling)
+     * @return amountOutReceived The amount of tokens that were swapped (denominated in token user is buying)
      */
     function limitOrderTrade(
         bool zeroForOne,
         int24 tick,
         uint256 amountIn
-    ) external returns (uint256 amountInExecuted);
+    ) external returns (uint256 amountInExecuted, uint256 amountOutReceived);
 
     /**
      * @notice Swap token0 for token1 or token1 for token0
@@ -31,12 +32,13 @@ interface ICubensisPool {
      * @param tick The tick at which the trade should be executed.
      * @param amountIn The amount of tokens to swap (in token that the user is selling)
      * @return amountInExecuted The amount of tokens that were swapped (denominated in token user is selling)
+     * @return amountOutReceived The amount of tokens that were swapped (denominated in token user is buying)
      */
     function spotOrderTrade(
         bool zeroForOne,
         int24 tick,
         uint256 amountIn
-    ) external returns (uint256 amountInExecuted);
+    ) external returns (uint256 amountInExecuted, uint256 amountOutReceived);
 
     /**
      * @notice Remove order previously created at a given tick
