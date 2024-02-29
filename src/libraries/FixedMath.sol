@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import { UD60x18, convert } from "@prb/math/src/UD60x18.sol";
+import { UD60x18, convert, ZERO } from "@prb/math/src/UD60x18.sol";
 
 /// @title FixedMath
 /// @notice Contains functions for managing tick processes and relevant calculations
@@ -25,13 +25,18 @@ library FixedMath {
     function tickValue(
         int24 tick
     ) internal pure returns (UD60x18 value) {
+        
+        // revert Debug(ZERO, baseTickValue().pow(convert(uint256(uint24(min)))));
         if (tick >= 0) {
-             value = baseTickValue().pow(convert(uint256(uint24(tick))));
+             value = baseTickValue().powu(uint256(uint24(tick)));
         } else {
-            value = convert(1) / baseTickValue().pow(convert(uint256(uint24(tick))));
+            tick = tick * -1;
+            value = convert(1) / baseTickValue().powu(uint256(uint24(tick)));
         }
     }
     
+    error Debug(UD60x18, uint256);
+
     /**
      * @notice Get price for an entire trade at a given tick
      * @param zeroForOne side of the trade

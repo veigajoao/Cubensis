@@ -54,9 +54,8 @@ library Position {
             self.counter = _tick.counter;
             self.executedRatio = _tick.executedRatio;
             // self.totalBalance = ZERO; // not necessary, starts as zero
-        }
-
-        if (_tick.counter != _self.counter) {
+            executed = ZERO;
+        } else if (_tick.counter != _self.counter) {
             // if counter is different that means the tick was executed in full
             // and has restarted. execute entire user position
             executed = _self.totalBalance;

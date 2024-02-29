@@ -14,9 +14,15 @@ import "../src/libraries/FixedMath.sol";
 contract CubensisTest is Test {
     MockCubensisPool public pool;
 
+    error Debug(uint256, uint256, uint256, uint256);
+
     address public alice;
     address public bob;
     address public carmen;
+
+    // tick limits
+    int24 internal constant MIN_TICK = -887272;
+    int24 internal constant MAX_TICK = -MIN_TICK;
 
     // mocked decimals for tokens
     uint256 constant DECIMALS = 1e18;
@@ -153,7 +159,82 @@ contract CubensisTest is Test {
     }
 
     // use fuzzying to make sure all prices are calculated correctly
-    function test_limit_order_broken_value_ticks() public {}
+    function test_limit_order_broken_value_ticks(
+        uint256 initialTokenAmount,
+        uint256 amount0,
+        uint256 amount1,
+        int24 tick,
+        string memory account1
+    ) public {
+        // initialTokenAmount = 2.771e14;
+        vm.assume(amount0 <= initialTokenAmount);
+        vm.assume(amount1 <= initialTokenAmount);
+        // test with large token amounts
+        vm.assume(initialTokenAmount <= 5e32);
+        vm.assume(initialTokenAmount >= 5e16);
+        // we cannot exponentiate by very large numbers
+        // causes overflow on FixedMath.tickValue
+        // this covers up unti 1e52 price scale
+        // vm.assume(tick >= -135000);
+        vm.assume(tick >= 35000);
+        vm.assume(tick <= 135000);
+        // vm.assume(tick >= MIN_TICK);
+        // vm.assume(tick <= MAX_TICK);
+       
+
+        vm.assume(amount0 > 5000);
+        vm.assume(amount1 > 5000);
+        address amanda = makeAddr(account1);
+        address barney = makeAddr(string.concat(account1, "a"));
+
+        // give accounts balance
+        pool.addTokensAccount(false, initialTokenAmount, amanda);
+        pool.addTokensAccount(false, initialTokenAmount, barney);
+        pool.addTokensAccount(true, initialTokenAmount, amanda);
+        pool.addTokensAccount(true, initialTokenAmount, barney);
+
+        // both users add different random amounts to same random tick
+        vm.prank(amanda);
+        (uint256 executedAmanda, uint256 receivedAmanda) = pool.limitOrderTrade(false, tick, amount0);
+        vm.prank(barney);
+
+        // error here, arithmetic overflow that I can't locate
+        (uint256 executedBarney, uint256 receivedBarney) = pool.limitOrderTrade(true, tick, amount1);
+        require(false, "penis");
+        
+        // user that bid first updates their position
+        vm.prank(amanda);
+        (, uint256 receivedAmanda1_1) = pool.claimExceutedOrder(tick);
+
+        // update amanda's position to sum executed tokens
+        (, UD60x18 remainingBalance,) = pool.ticks(true, tick);
+        executedAmanda = initialTokenAmount - (amount1 - convert(remainingBalance));
+        // update amanda's position to sum receivals from update
+        receivedAmanda = receivedAmanda1_1;
+
+        // uint256 tokensToReceive0 = convert(FixedMath.convertAtTick(true, tick, convert(amount1)));
+        // uint256 tokensToReceive1 = convert(FixedMath.convertAtTick(false, tick, convert(amount0)));
+
+        // if (tokensToReceive0 > amount0) {
+        //     tokensToReceive0 = amount0;
+        // }
+        // if (tokensToReceive1 > amount1) {
+        //     tokensToReceive1 = amount1;
+        // }
+
+        // assert(tokensToReceive0 == receivedAmanda);
+
+        
+
+        // assert(tokensToReceive1 == receivedBarney);
+        
+        // assert(receivedAmanda == executedBarney);
+
+        // revert Debug(receivedBarney, executedAmanda, amount1, convert(remainingBalance));
+        // assert(receivedBarney == executedAmanda);
+        
+
+    }
 
     // make sure flipping of ticks doesn't cause any bug
     function test_limit_order_multiple_consecutive_flip_ticks() public {}

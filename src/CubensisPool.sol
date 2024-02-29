@@ -186,15 +186,18 @@ contract CubensisPool is ICubensisPool {
 
         // transfer amountIn to contract
         _removeTokensAccount(!zeroForOne, _amountIn, _sender);
-
+        
         // check tick for other side trade
         (UD60x18 _executed, UD60x18 _received) = _executeOnTick(zeroForOne, tick, _amountIn);
 
         // add rest as limit order
-        _addLiquidityToTick(!zeroForOne, tick, _amountIn - _executed, _sender);
+        if (_executed < _amountIn) {
+            _addLiquidityToTick(!zeroForOne, tick, _amountIn - _executed, _sender);
+        }
 
         // transfer received tokens
         _addTokensAccount(zeroForOne, _received, _sender);
+        
 
         amountInExecuted = convert(_executed);
         amountOutReceived = convert(_received);
