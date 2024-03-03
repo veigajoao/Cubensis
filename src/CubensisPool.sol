@@ -14,7 +14,8 @@ contract CubensisPool is ICubensisPool {
     using Position for mapping(bytes32 => Position.Info); 
     using Position for Position.Info;
 
-    error Debug(uint256);
+    error Debug(UD60x18, UD60x18);
+    error Debug2(uint256, uint256);
 
     // address for token pair in pool
     // prices are always quoted as token1/token0
@@ -159,18 +160,18 @@ contract CubensisPool is ICubensisPool {
         if (_tickInfo.totalBalance <= tokensToReceive) {
             // If trade is going to take all tokens, recalculated received and executed
             received = _tickInfo.totalBalance;
-            executed = FixedMath.convertAtTick(zeroForOne, tick, received);
+            executed = FixedMath.convertAtTick(!zeroForOne, tick, received);
             // set executedBalance to be the full amount of tokens
-            // only call if executed > 0
-            if (executed > ZERO) tickInfo.applyTrade(executed);
+            // on the other side of liquidity
+            // only call if received > 0
+            if (received > ZERO) tickInfo.applyTrade(received);
             
         } else {
             // If trade does not deplete tick, merely update variables
             received = tokensToReceive;
             executed = amount;
-            tickInfo.applyTrade(executed);
+            tickInfo.applyTrade(received);
         }
-        
     }
 
     /// PUBLIC FUNCTIONS
@@ -186,7 +187,7 @@ contract CubensisPool is ICubensisPool {
 
         // transfer amountIn to contract
         _removeTokensAccount(!zeroForOne, _amountIn, _sender);
-        
+
         // check tick for other side trade
         (UD60x18 _executed, UD60x18 _received) = _executeOnTick(zeroForOne, tick, _amountIn);
 
@@ -197,7 +198,6 @@ contract CubensisPool is ICubensisPool {
 
         // transfer received tokens
         _addTokensAccount(zeroForOne, _received, _sender);
-        
 
         amountInExecuted = convert(_executed);
         amountOutReceived = convert(_received);
@@ -226,7 +226,7 @@ contract CubensisPool is ICubensisPool {
         _addTokensAccount(zeroForOne, _received, _sender);
 
         amountInExecuted = convert(_executed);
-         amountOutReceived = convert(_received);
+        amountOutReceived = convert(_received);
     }
 
     /// @inheritdoc ICubensisPool
@@ -239,21 +239,32 @@ contract CubensisPool is ICubensisPool {
     }
 
     /// @inheritdoc ICubensisPool
-    function claimExceutedOrder(
+    function claimExecutedOrder(
         int24 tick
-    ) external virtual returns (uint256 amount0, uint256 amount1) {
+    ) external virtual returns (
+        uint256 executedAmount0,
+        uint256 receivedAmount0,
+        uint256 executedAmount1, 
+        uint256 receivedAmount1
+    ) {
         address _sender = msg.sender;
 
         // update positions
         UD60x18 _executed0 = positions[false].get(_sender, tick).update(ticks[false][tick]);
         UD60x18 _executed1 = positions[true].get(_sender, tick).update(ticks[true][tick]);
 
-        // send tokens
-        _addTokensAccount(false, _executed0, _sender);
-        _addTokensAccount(true, _executed1, _sender);
+        // calculate value of executed position
+        UD60x18 _received0 = FixedMath.convertAtTick(false, tick, _executed1);
+        UD60x18 _received1 = FixedMath.convertAtTick(true, tick, _executed0);
 
-        amount0 = convert(_executed0);
-        amount1 = convert(_executed1);
+        // send tokens
+        _addTokensAccount(false, _received0, _sender);
+        _addTokensAccount(true, _received1, _sender);
+
+        executedAmount0 = convert(_executed0);
+        receivedAmount0 = convert(_received0);
+        executedAmount1 = convert(_executed1);
+        receivedAmount1 = convert(_received1);
     }
 
 }

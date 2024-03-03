@@ -39,9 +39,9 @@ library FixedMath {
 
     /**
      * @notice Get price for an entire trade at a given tick
-     * @param zeroForOne side of the trade
+     * @param zeroForOne side of the trade (token to receive)
      * @param tick tick of the trade
-     * @param base amount of base token for trade
+     * @param base amount of base token for trade (opposite of zeroForOne)
      */
     function convertAtTick(
         bool zeroForOne,

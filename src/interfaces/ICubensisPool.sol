@@ -61,10 +61,17 @@ interface ICubensisPool {
      * to return to user's balance. Calling this function returns claims all tokens
      * in a given tick.
      * @param tick Tick from ehich to claim executed orders
-     * @return amount0 Amount of token0 claimed
-     * @return amount1 Amount of token1 claimed
+     * @return executedAmount0 Amount of token0 executed (sold) since last update
+     * @return receivedAmount0 Amount of token0 claimed
+     * @return executedAmount1 Amount of token1 executed (sold) since last update
+     * @return receivedAmount1 Amount of token1 claimed
      */
-    function claimExceutedOrder(
+    function claimExecutedOrder(
         int24 tick
-    ) external returns (uint256 amount0, uint256 amount1);
+    ) external returns (
+        uint256 executedAmount0,
+        uint256 receivedAmount0,
+        uint256 executedAmount1, 
+        uint256 receivedAmount1
+    );
 }

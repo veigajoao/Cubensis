@@ -14,7 +14,8 @@ import "../src/libraries/FixedMath.sol";
 contract CubensisTest is Test {
     MockCubensisPool public pool;
 
-    error Debug(uint256, uint256, uint256, uint256);
+    error Debug(uint256, uint256, uint256, uint256, uint256, uint256);
+    error Debug2(int24, int24, int24, int24);
 
     address public alice;
     address public bob;
@@ -166,24 +167,24 @@ contract CubensisTest is Test {
         int24 tick,
         string memory account1
     ) public {
-        // initialTokenAmount = 2.771e14;
-        vm.assume(amount0 <= initialTokenAmount);
-        vm.assume(amount1 <= initialTokenAmount);
         // test with large token amounts
-        vm.assume(initialTokenAmount <= 5e32);
-        vm.assume(initialTokenAmount >= 5e16);
+        vm.assume(initialTokenAmount < 5e32);
+        vm.assume(amount0 < initialTokenAmount);
+        vm.assume(amount1 <  initialTokenAmount);
+
+        initialTokenAmount = bound(initialTokenAmount, 5e16, 5e29);
+
+        amount0 = bound(amount0, 5000, 1.5e20);
+        amount1 = bound(amount1, 5000, 1.5e20);
+
+        amount0 = 5000;
+        amount1 = 5000;
+        
         // we cannot exponentiate by very large numbers
         // causes overflow on FixedMath.tickValue
-        // this covers up unti 1e52 price scale
-        // vm.assume(tick >= -135000);
-        vm.assume(tick >= 35000);
-        vm.assume(tick <= 135000);
-        // vm.assume(tick >= MIN_TICK);
-        // vm.assume(tick <= MAX_TICK);
-       
+        // this covers up unti 1e21/1 price scale
+        tick = int24(bound(tick, -35000, 35000));
 
-        vm.assume(amount0 > 5000);
-        vm.assume(amount1 > 5000);
         address amanda = makeAddr(account1);
         address barney = makeAddr(string.concat(account1, "a"));
 
@@ -195,44 +196,37 @@ contract CubensisTest is Test {
 
         // both users add different random amounts to same random tick
         vm.prank(amanda);
-        (uint256 executedAmanda, uint256 receivedAmanda) = pool.limitOrderTrade(false, tick, amount0);
+        (uint256 executedAmanda, uint256 receivedAmanda) = pool.limitOrderTrade(false, tick, amount1);
+        
         vm.prank(barney);
-
-        // error here, arithmetic overflow that I can't locate
-        (uint256 executedBarney, uint256 receivedBarney) = pool.limitOrderTrade(true, tick, amount1);
-        require(false, "penis");
+        (uint256 executedBarney, uint256 receivedBarney) = pool.limitOrderTrade(true, tick, amount0);
         
         // user that bid first updates their position
         vm.prank(amanda);
-        (, uint256 receivedAmanda1_1) = pool.claimExceutedOrder(tick);
-
+        (,uint256 receivedAmanda0_1,uint256 executedAmanda_1,) = pool.claimExecutedOrder(tick);
         // update amanda's position to sum executed tokens
-        (, UD60x18 remainingBalance,) = pool.ticks(true, tick);
-        executedAmanda = initialTokenAmount - (amount1 - convert(remainingBalance));
+        executedAmanda += executedAmanda_1;
         // update amanda's position to sum receivals from update
-        receivedAmanda = receivedAmanda1_1;
+        receivedAmanda += receivedAmanda0_1;
 
-        // uint256 tokensToReceive0 = convert(FixedMath.convertAtTick(true, tick, convert(amount1)));
-        // uint256 tokensToReceive1 = convert(FixedMath.convertAtTick(false, tick, convert(amount0)));
+        uint256 tokensToReceive0 = convert(FixedMath.convertAtTick(true, tick, convert(amount1)));
+        uint256 tokensToReceive1 = convert(FixedMath.convertAtTick(false, tick, convert(amount0)));
 
-        // if (tokensToReceive0 > amount0) {
-        //     tokensToReceive0 = amount0;
-        // }
-        // if (tokensToReceive1 > amount1) {
-        //     tokensToReceive1 = amount1;
-        // }
+        if (tokensToReceive0 > amount0) {
+            tokensToReceive0 = amount0;
+        }
+        if (tokensToReceive1 > amount1) {
+            tokensToReceive1 = amount1;
+        }
 
-        // assert(tokensToReceive0 == receivedAmanda);
-
+        assertEq(tokensToReceive1, receivedAmanda, "Amanda should receive correct amount of tokens");
+    
+        assertEq(tokensToReceive0, receivedBarney, "Barney should receive correct amount of tokens");
         
-
-        // assert(tokensToReceive1 == receivedBarney);
+        assertEq(receivedAmanda, executedBarney, "Amanda's received tokens should be equal to Barney's executed tokens");
         
-        // assert(receivedAmanda == executedBarney);
+        assertEq(receivedBarney, executedAmanda, "Barney's received tokens should be equal to Amanda's executed tokens");
 
-        // revert Debug(receivedBarney, executedAmanda, amount1, convert(remainingBalance));
-        // assert(receivedBarney == executedAmanda);
-        
 
     }
 

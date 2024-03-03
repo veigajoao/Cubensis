@@ -21,7 +21,8 @@ The main goal of this project is to provide the basis for a fully on chain order
 - [ ] Build relevant tests
  
 ### Future work
-- [ ] Currently order of execution within the same `tick` are executed in parallel, according to their share of the `tick` pool. We need to make sure that is acceptable
+- [ ] Currently trading amounts that are very small can create rounding down scenarios where it is possible to buy tokens for "free". A production implementation must create larger fixed point types and conversion logic that ensures this never happens (it is possible and simple bu at the same time it's a lot of work to implement properly and efficiently)
+- [ ] Currently order of execution within the same `tick` are executed in parallel, according to their share of the `tick` pool. We need to make sure that is acceptable - traditional orderbooks execute orders at same price range in FIFO
 - [ ] Currently assets are locked and do not generate yield when they are awaiting execution. A way to generate yield would facilitate liquidity for the protocol
 - [ ] A private implementation of Cubensis requires adapting to privacy preserving libraries and designs of the target chain
 
